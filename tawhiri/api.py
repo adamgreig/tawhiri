@@ -19,259 +19,432 @@
 Provide the HTTP API for Tawhiri.
 """
 
+import itertools
+
 from flask import Flask, jsonify, request, g
 from datetime import datetime
 import time
 import strict_rfc3339
+from werkzeug.exceptions import BadRequest
 
-from tawhiri import solver, models
+from tawhiri import solver, models, interpolate
 from tawhiri.dataset import Dataset as WindDataset
 from ruaumoko import Dataset as ElevationDataset
 
 app = Flask(__name__)
 
 API_VERSION = 1
-LATEST_DATASET_KEYWORD = "latest"
+LATEST_DATASET = "latest"
 PROFILE_STANDARD = "standard_profile"
 PROFILE_FLOAT = "float_profile"
+PROFILES = {PROFILE_STANDARD, PROFILE_FLOAT}
+PREDICTION_COUNT_LIMIT = 200
+
+ruaumoko_ds = None
+
+
+# Setup #######################################################################
+@app.before_first_request
+def open_ruaumoko_ds():
+    global ruaumoko_ds
+    ds_loc = app.config.get('ELEVATION_DATASET', ElevationDataset.default_location)
+    ruaumoko_ds = ElevationDataset(ds_loc)
 
 
 # Util functions ##############################################################
-def ruaumoko_ds():
-    if not hasattr("ruaumoko_ds", "once"):
-        ds_loc = app.config.get('ELEVATION_DATASET', ElevationDataset.default_location)
-        ruaumoko_ds.once = ElevationDataset(ds_loc)
-
-    return ruaumoko_ds.once
-
-def _rfc3339_to_timestamp(dt):
-    """
-    Convert from a RFC3339 timestamp to a UNIX timestamp.
-    """
-    return strict_rfc3339.rfc3339_to_timestamp(dt)
-
-
-def _timestamp_to_rfc3339(dt):
-    """
-    Convert from a UNIX timestamp to a RFC3339 timestamp.
-    """
-    return strict_rfc3339.timestamp_to_rfc3339_utcoffset(dt)
-
-
-# Exceptions ##################################################################
-class APIException(Exception):
-    """
-    Base API exception.
-    """
-    status_code = 500
-
-
-class RequestException(APIException):
-    """
-    Raised if request is invalid.
-    """
-    status_code = 400
-
-
-class InvalidDatasetException(APIException):
-    """
-    Raised if the dataset specified in the request is invalid.
-    """
-    status_code = 404
-
-
-class PredictionException(APIException):
-    """
-    Raised if the solver raises an exception.
-    """
-    status_code = 500
-
-
-class InternalException(APIException):
-    """
-    Raised when an internal error occurs.
-    """
-    status_code = 500
-
-
-class NotYetImplementedException(APIException):
-    """
-    Raised when the functionality has not yet been implemented.
-    """
-    status_code = 501
-
-
-# Request #####################################################################
-def parse_request(data):
-    """
-    Parse the request.
-    """
-    req = {"version": API_VERSION}
-
-    # Generic fields
-    req['launch_latitude'] = \
-        _extract_parameter(data, "launch_latitude", float,
-                           validator=lambda x: -90 <= x <= 90)
-    req['launch_longitude'] = \
-        _extract_parameter(data, "launch_longitude", float,
-                           validator=lambda x: 0 <= x < 360)
-    req['launch_datetime'] = \
-        _extract_parameter(data, "launch_datetime", _rfc3339_to_timestamp)
-    req['launch_altitude'] = \
-        _extract_parameter(data, "launch_altitude", float, ignore=True)
-
-    # If no launch altitude provided, use Ruaumoko to look it up
-    if req['launch_altitude'] is None:
-        try:
-            req['launch_altitude'] = ruaumoko_ds().get(req['launch_latitude'],
-                                                       req['launch_longitude'])
-        except Exception:
-            raise InternalException("Internal exception experienced whilst " +
-                                    "looking up 'launch_altitude'.")
-
-    # Prediction profile
-    req['profile'] = _extract_parameter(data, "profile", str,
-                                        PROFILE_STANDARD)
-
-    launch_alt = req["launch_altitude"]
-
-    if req['profile'] == PROFILE_STANDARD:
-        req['ascent_rate'] = _extract_parameter(data, "ascent_rate", float,
-                                                validator=lambda x: x > 0)
-        req['burst_altitude'] = \
-            _extract_parameter(data, "burst_altitude", float,
-                               validator=lambda x: x > launch_alt)
-        req['descent_rate'] = _extract_parameter(data, "descent_rate", float,
-                                                 validator=lambda x: x > 0)
-    elif req['profile'] == PROFILE_FLOAT:
-        req['ascent_rate'] = _extract_parameter(data, "ascent_rate", float,
-                                                validator=lambda x: x > 0)
-        req['float_altitude'] = \
-            _extract_parameter(data, "float_altitude", float,
-                               validator=lambda x: x > launch_alt)
-        req['stop_datetime'] = \
-            _extract_parameter(data, "stop_datetime", _rfc3339_to_timestamp,
-                               validator=lambda x: x > req['launch_datetime'])
-    else:
-        raise RequestException("Unknown profile '%s'." % req['profile'])
-
-    # Dataset
-    req['dataset'] = _extract_parameter(data, "dataset", _rfc3339_to_timestamp,
-                                        LATEST_DATASET_KEYWORD)
-
-    return req
-
-
-def _extract_parameter(data, parameter, cast, default=None, ignore=False,
-                       validator=None):
-    """
-    Extract a parameter from the POST request and raise an exception if any
-    parameter is missing or invalid.
-    """
-    if parameter not in data:
-        if default is None and not ignore:
-            raise RequestException("Parameter '%s' not provided in request." %
-                                   parameter)
-        return default
-
-    try:
-        result = cast(data[parameter])
-    except Exception:
-        raise RequestException("Unable to parse parameter '%s': %s." %
-                               (parameter, data[parameter]))
-
-    if validator is not None and not validator(result):
-        raise RequestException("Invalid value for parameter '%s': %s." %
-                               (parameter, data[parameter]))
-
-    return result
-
-
-# Response ####################################################################
-def run_prediction(req):
-    """
-    Run the prediction.
-    """
-    # Response dict
-    resp = {
-        "request": req,
-        "prediction": [],
-    }
-
+def open_dataset(ds_time):
     # Find wind data location
     ds_dir = app.config.get('WIND_DATASET_DIR', WindDataset.DEFAULT_DIRECTORY)
 
-    # Dataset
     try:
-        if req['dataset'] == LATEST_DATASET_KEYWORD:
-            tawhiri_ds = WindDataset.open_latest(persistent=True, directory=ds_dir)
+        if ds_time == LATEST_DATASET:
+            ds = WindDataset.open_latest(persistent=True, directory=ds_dir)
         else:
-            tawhiri_ds = WindDataset(datetime.fromtimestamp(req['dataset']), directory=ds_dir)
+            ds = WindDataset(ds_time, directory=ds_dir)
     except IOError:
         raise InvalidDatasetException("No matching dataset found.")
     except ValueError as e:
         raise InvalidDatasetException(*e.args)
 
-    # Note that hours and minutes are set to 00 as Tawhiri uses hourly datasets
-    resp['request']['dataset'] = tawhiri_ds.ds_time.strftime(
-        "%Y-%m-%dT%H:00:00Z")
+    return ds
 
-    # Stages
-    if req['profile'] == PROFILE_STANDARD:
-        stages = models.standard_profile(req['ascent_rate'],
-                                         req['burst_altitude'],
-                                         req['descent_rate'], tawhiri_ds,
-                                         ruaumoko_ds())
-    elif req['profile'] == PROFILE_FLOAT:
-        stages = models.float_profile(req['ascent_rate'],
-                                      req['float_altitude'],
-                                      req['stop_datetime'], tawhiri_ds)
+def timestamp_to_rfc3339(dt):
+    """Convert from a UNIX timestamp to a RFC3339 timestamp."""
+    return strict_rfc3339.timestamp_to_rfc3339_utcoffset(dt)
+
+def json_error(err):
+    if hasattr(err, "to_json"):
+        return err.to_json()
     else:
-        raise InternalException("No implementation for known profile.")
-
-    # Run solver
-    try:
-        result = solver.solve(req['launch_datetime'], req['launch_latitude'],
-                              req['launch_longitude'], req['launch_altitude'],
-                              stages)
-    except Exception as e:
-        raise PredictionException("Prediction did not complete: '%s'." %
-                                  str(e))
-
-    # Format trajectory
-    if req['profile'] == PROFILE_STANDARD:
-        resp['prediction'] = _parse_stages(["ascent", "descent"], result)
-    elif req['profile'] == PROFILE_FLOAT:
-        resp['prediction'] = _parse_stages(["ascent", "float"], result)
-    else:
-        raise InternalException("No implementation for known profile.")
-
-    # Convert request UNIX timestamps to RFC3339 timestamps
-    for key in resp['request']:
-        if "datetime" in key:
-            resp['request'][key] = _timestamp_to_rfc3339(resp['request'][key])
-
-    return resp
+        return {
+            "type": type(err).__name__,
+            "description": str(err)
+        }
 
 
-def _parse_stages(labels, data):
-    """
-    Parse the predictor output for a set of stages.
-    """
-    assert len(labels) == len(data)
+# Exceptions ##################################################################
+class RequestException(BadRequest): pass
 
-    prediction = []
-    for index, leg in enumerate(data):
-        stage = {}
-        stage['stage'] = labels[index]
-        stage['trajectory'] = [{
-            'latitude': lat,
-            'longitude': lon,
-            'altitude': alt,
-            'datetime': _timestamp_to_rfc3339(dt),
-            } for dt, lat, lon, alt in leg]
-        prediction.append(stage)
-    return prediction
+class MissingParameter(RequestException, KeyError):
+    def __init__(self, key):
+        self.key = key
+
+    def __str__(self):
+        return "Missing {}".format(self.key)
+
+    def to_json(self):
+        return {
+            "type": "MissingParameter",
+            "key": self.key,
+            "description": self.key
+        }
+
+class InvalidParameter(RequestException, ValueError):
+    def __init__(self, key, value):
+        self.key = key
+        self.value = value
+
+    def __str__(self):
+        return "Invalid {0.key}: {0.value}".format(self)
+
+    def to_json(self):
+        return {
+            "type": "InvalidParameter",
+            "key": self.key,
+            "value": self.value,
+            "description": str(self)
+        }
+
+class TooManyPredictions(RequestException):
+    def __init__(self, n):
+        super(TooManyPredictions, self).__init__(str(n))
+        self.n = n
+
+    def __str__(self):
+        return "Too many predictions: {}".format(self.n)
+
+    def to_json(self):
+        return {
+            "type": "TooManyPredictions",
+            "n": self.n,
+            "description": str(self)
+        }
+
+
+# Request #####################################################################
+class MultiRequest:
+    def __init__(self, data):
+        self.launch_latitude = self._get_lat(data, "launch_latitude")
+        self.launch_longitude = self._get_lon(data, "launch_longitude")
+        self.launch_datetime = self._get_datetime(data, "launch_datetime")
+        self.launch_altitude = \
+            self._get_single_float(data, "launch_altitude", optional=True)
+        self.dataset = self._get_ds_time(data)
+        self.profile = self._get_profile(data)
+        self.truncate_trajectories = \
+            self._get_bool(data, "truncate_trajectories")
+
+        self.ascent_rate = self._get_multi_flts(data, "ascent_rate")
+
+        if self.profile == PROFILE_STANDARD:
+            self.burst_altitude = self._get_multi_flts(data, "burst_altitude")
+            self.descent_rate = self._get_multi_flts(data, "descent_rate")
+        elif self.profile == PROFILE_FLOAT:
+            self.float_altitude = self._get_multi_flts(data, "float_altitude")
+
+            def stvd(x): return x > self.launch_datetime
+            self.stop_datetime = \
+                self._get_datetime(data, "stop_datetime", validator=stvd)
+
+        else:
+            raise AssertionError(req['profile'])
+
+        l = len(self)
+        assert l != 0
+        if l > PREDICTION_COUNT_LIMIT:
+            raise TooManyPredictions(l)
+
+    def set_default_launch_alt(self, ruaumoko):
+        if self.launch_altitude is None:
+            self.launch_altitude = \
+                    ruaumoko.get(self.launch_latitude, self.launch_longitude)
+
+    def _get_bool(self, data, key, default=False):
+        try:
+            r = data[key].lower()
+        except KeyError:
+            return default
+        
+        if r not in ("true", "false"):
+            raise InvalidParameter(key, r)
+
+        return r == "true"
+
+    def _get_single_float(self, data, key, optional=False, validator=None):
+        try:
+            r = data[key]
+        except KeyError:
+            if optional:
+                return None
+            else:
+                raise MissingParameter(key)
+
+        try:
+            r = float(r)
+        except ValueError:
+            raise InvalidParameter(key, r)
+ 
+        if not validator(r):
+            raise InvalidParameter(key, r)
+
+        return r
+
+    def _get_lat(self, data, key):
+        return self._get_single_float(data, key,
+                                      validator=lambda x: -90 <= x <= 90)
+    def _get_lon(self, data, key):
+        return self._get_single_float(data, key,
+                                      validator=lambda x: 0 <= x < 360)
+
+    def _get_datetime(self, data, key, validator=None):
+        try:
+            r = data[key]
+        except KeyError:
+            raise MissingParameter(key)
+
+        try:
+            r = strict_rfc3339.rfc3339_to_timestamp(r)
+        except KeyError:
+            raise InvalidParameter(key, r)
+
+        if validator is not None and not validator(r):
+            raise InvalidParameter(key, r)
+
+        return r
+
+    def _get_ds_time(self, data):
+        try:
+            ds_time_str = data["dataset"]
+        except KeyError:
+            ds_time_str = LATEST_DATASET
+
+        if ds_time_str != LATEST_DATASET:
+            try:
+                ds_time = datetime.strptime(ds_time_str, "%Y%m%d%H")
+                if ds_time.hour % 6 != 0:
+                    raise ValueError
+            except ValueError:
+                raise InvalidParameter("dataset", ds_time_str)
+        else:
+            ds_time = LATEST_DATASET
+
+        return ds_time
+
+    def _get_profile(self, data):
+        try:
+            p = data["profile"]
+        except KeyError:
+            p = PROFILE_STANDARD
+
+        if p not in PROFILES:
+            raise InvalidParameter("dataset", p)
+
+        return p
+
+    def _get_multi_flts(self, data, key, validator=None):
+        try:
+            vals = data.getlist(key) + data.getlist(key + "[]")
+        except KeyError:
+            raise MissingParameter(key)
+
+        if vals == []:
+            raise MissingParameter(key)
+
+        if not isinstance(vals, list):
+            vals = [vals]
+
+        def cast_and_validate(x):
+            try:
+                x = float(x)
+            except ValueError:
+                raise InvalidParameter(key, x)
+
+            if validator is not None and not validator(x):
+                raise InvalidParameter(key, x)
+
+            return x
+
+        vals = [cast_and_validate(x) for x in vals]
+        return vals
+
+    def __len__(self):
+        prod = len(self.ascent_rate)
+
+        if self.profile == PROFILE_STANDARD:
+            prod *= len(self.burst_altitude)
+            prod *= len(self.descent_rate)
+
+        elif self.profile == PROFILE_FLOAT:
+            prod *= len(self.float_altitude)
+
+        return prod
+
+    def __iter__(self):
+        if self.profile == PROFILE_STANDARD:
+            p = itertools.product(self.ascent_rate, self.burst_altitude,
+                                  self.descent_rate)
+            for asc, balt, desc in p:
+                yield Request(self, ascent_rate=asc, burst_altitude=balt,
+                              descent_rate=desc)
+
+        elif self.profile == PROFILE_FLOAT: 
+            p = itertools.product(self.ascent_rate, self.float_altitude)
+            for asc, falt in p:
+                yield Request(self, ascent_rate=asc, float_altitude=falt)
+
+class Request:
+    def __init__(self, parent, **specialisation):
+        self.parent = parent
+        if parent.profile == PROFILE_STANDARD:
+            assert set(specialisation) == \
+                    {"ascent_rate", "burst_altitude", "descent_rate"}
+            self.ascent_rate    = specialisation["ascent_rate"]
+            self.burst_altitude = specialisation["burst_altitude"]
+            self.descent_rate   = specialisation["descent_rate"]
+        elif parent.profile == PROFILE_FLOAT:
+            assert set(specialisation) == \
+                    {"ascent_rate", "float_altitude"}
+            self.ascent_rate    = specialisation["ascent_rate"]
+            self.float_altitude = specialisation["float_altitide"]
+        else:
+            raise AssertionError(req['profile'])
+
+    def __getattr__(self, key):
+        return getattr(self.parent, key)
+
+    def to_json(self):
+        ts_to_rfc3339 = strict_rfc3339.timestamp_to_rfc3339_utcoffset
+
+        r = {
+            "launch_latitude": self.launch_latitude,
+            "launch_longitude": self.launch_longitude,
+            "launch_datetime": ts_to_rfc3339(self.launch_datetime),
+            "launch_altitude": self.launch_altitude,
+            "dataset": self.dataset,
+            "profile": self.profile,
+            "truncate_trajectories": self.truncate_trajectories,
+            "ascent_rate": self.ascent_rate
+        }
+
+        if self.profile == PROFILE_STANDARD:
+            r["burst_altitude"] = self.burst_altitude
+            r["descent_rate"] = self.descent_rate
+        elif self.profile == PROFILE_FLOAT:
+            r["float_altitude"] = self.float_altitude
+            r["stop_datetime"] = self.stop_datetime
+        else:
+            raise AssertionError(req['profile'])
+
+        return r
+
+
+# Results #####################################################################
+class Result:
+    ok = "Unclear"
+
+    def __init__(self, req, actual_ds_used):
+        self.request = req
+        self.actual_ds_used = actual_ds_used
+
+class Prediction(Result):
+    ok = True
+
+    def __init__(self, req, actual_ds_used, result):
+        super(Prediction, self).__init__(req, actual_ds_used)
+        self.result = result
+
+    def to_json(self, truncate_trajectory=False):
+        return {
+            "request": self.request.to_json(),
+            "dataset": self.actual_ds_used,
+            "prediction": self._stages_to_json(truncate_trajectory)
+        }
+
+    def _stages_to_json(self, truncate_trajectory):
+        if self.request.profile == PROFILE_STANDARD:
+            labels = ("ascent", "descent")
+        elif self.request.profile == PROFILE_FLOAT:
+            labels = ("ascent", "float")
+        else:
+            raise AssertionError(self.request.profile)
+
+        assert len(labels) == len(self.result)
+
+        prediction = []
+        for label, leg in zip(labels, self.result):
+            if truncate_trajectory:
+                leg = [leg[0], leg[-1]]
+
+            ts_to_rfc3339 = strict_rfc3339.timestamp_to_rfc3339_utcoffset
+            stage = {
+                "stage": label,
+                "trajectory":
+                    [{'latitude': lat, 'longitude': lon,
+                      'altitude': alt, 'datetime': ts_to_rfc3339(dt)}
+                     for dt, lat, lon, alt in leg]
+            }
+            prediction.append(stage)
+
+        return prediction
+
+class PredictionFailure(Result):
+    ok = False
+
+    def __init__(self, req, actual_ds_used, error):
+        super(PredictionFailure, self).__init__(req, actual_ds_used)
+        self.error = error
+
+    def to_json(self, truncate_trajectory=None):
+        return {
+            "request": self.request.to_json(),
+            "dataset": self.actual_ds_used,
+            "error": json_error(self.error)
+        }
+
+# Response ####################################################################
+def run_all_predictions(multireq):
+    wind_ds = open_dataset(multireq.dataset)
+    actual_ds_used = wind_ds.ds_time.strftime("%Y-%m-%dT%H:00:00Z")
+
+    for req in multireq:
+        assert multireq.dataset == req.dataset
+
+        # Stages
+        if req.profile == PROFILE_STANDARD:
+            stages = models.standard_profile(
+                req.ascent_rate, req.burst_altitude,
+                req.descent_rate, wind_ds,
+                ruaumoko_ds
+            )
+        elif req.profile == PROFILE_FLOAT:
+            stages = models.float_profile(
+                req.ascent_rate, req.float_altiutde,
+                req.stop_datetime, wind_ds
+            )
+        else:
+            raise AssertionError(req.profile)
+
+        # Run solver
+        try:
+            result = solver.solve(
+                req.launch_datetime, req.launch_latitude,
+                req.launch_longitude, req.launch_altitude,
+                stages
+            )
+        except Exception as e:
+            yield PredictionFailure(req, actual_ds_used, e)
+        else:
+            yield Prediction(req, actual_ds_used, result)
 
 
 # Flask App ###################################################################
@@ -280,33 +453,22 @@ def main():
     """
     Single API endpoint which accepts GET requests.
     """
-    g.request_start_time = time.time()
-    response = run_prediction(parse_request(request.args))
-    g.request_complete_time = time.time()
-    response['metadata'] = _format_request_metadata()
-    return jsonify(response)
+    multireq = MultiRequest(request.args)
+    multireq.set_default_launch_alt(ruaumoko_ds)
+    predictions = list(run_all_predictions(multireq))
+
+    atleast_one_success = any(p.ok for p in predictions)
+    if not atleast_one_success:
+        raise predictions[0].error
+
+    predictions = [p.to_json(multireq.truncate_trajectories)
+                   for p in predictions]
+
+    return jsonify(predictions=predictions)
 
 
-@app.errorhandler(APIException)
+@app.errorhandler(BadRequest)
+@app.errorhandler(400)
+@app.errorhandler(interpolate.RangeError)
 def handle_exception(error):
-    """
-    Return correct error message and HTTP status code for API exceptions.
-    """
-    response = {}
-    response['error'] = {
-        "type": type(error).__name__,
-        "description": str(error)
-    }
-    g.request_complete_time = time.time()
-    response['metadata'] = _format_request_metadata()
-    return jsonify(response), error.status_code
-
-
-def _format_request_metadata():
-    """
-    Format the request metadata for inclusion in the response.
-    """
-    return {
-        "start_datetime": _timestamp_to_rfc3339(g.request_start_time),
-        "complete_datetime": _timestamp_to_rfc3339(g.request_complete_time),
-    }
+    return jsonify(error=json_error(error)), getattr(error, "code", 500)

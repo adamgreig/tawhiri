@@ -43,3 +43,6 @@ def main():
             return redirect(url_for('send_index'))
 
     return manager.run()
+
+if __name__ == "__main__":
+    main()
