@@ -13,3 +13,14 @@ body {
     padding-top: 20px;
 }
 
+#runpred {
+    width: 100%;
+}
+
+.dropdown-menu-units {
+    min-width: 50px;
+}
+
+.dropdown-label {
+    font-weight: bold;
+}

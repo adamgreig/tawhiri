@@ -6,7 +6,6 @@
   <meta name=viewport content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <link rel=stylesheet href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.4/css/bootstrap.min.css">
   <link rel=stylesheet href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datetimepicker/4.7.14/css/bootstrap-datetimepicker.min.css">
-  <!--<link rel=stylesheet href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.3.0/css/font-awesome.min.css">-->
   <link rel=stylesheet href="/tawhiri.css">
 </head>
 <body>
@@ -32,199 +31,20 @@
       </div>
     </div>
   </nav>
-
   <div class=container-fluid>
     <div class="row">
-      <div class="col-sm-4 col-md-3" id=sidebar>
-        <form class=form-horizontal>
-          <div class=form-group>
-            <div class=col-sm-12>
-              <div class=input-group>
-                <span class=input-group-btn>
-                  <button class="btn btn-info" id=gps-locate type=button title="use GPS location">
-                    <span class="glyphicon glyphicon-globe"></i>
-                  </button>
-                </span>
-                <input autocomplete=off class=form-control id=pac-input placeholder="Right click map or search" type=text>
-                <span class=input-group-btn>
-                  <button class="btn btn-default" id=pac-input-submit type=button>
-                    <span class="glyphicon glyphicon-search"></span>
-                  </button>
-                </span>
-              </div>
-            </div>
-          </div>
-          <div class=form-group>
-            <label for=inp-launch-lat class="control-label col-sm-4">Latitude</label>
-            <div class=col-sm-8>
-              <input class=form-control id=inp-launch-lat name=launch-lat type=number required>
-            </div>
-          </div>
-          <div class=form-group>
-            <label for=inp-launch-lng class="control-label col-sm-4">Longitude</label>
-            <div class=col-sm-8>
-              <input class=form-control id=inp-launch-lng name=launch-lng type=number required>
-            </div>
-          </div>
-          <div class=form-group>
-            <label for=inp-launch-alt class="control-label col-sm-4">Altitude</label>
-            <div class=col-sm-8>
-              <div class=input-group>
-                <input step=any class=form-control id=inp-launch-alt name=launch-alt type=number required>
-                <div class="input-group-btn unit-selector">
-                  <input name=launch-alt-unit value=m type=hidden>
-                  <button type=button class="btn btn-default dropdown-toggle" data-toggle=dropdown>
-                    <span class=current-unit>m</span> <span class=caret></span>
-                  </button>
-                  <ul class="dropdown-menu dropdown-menu-right">
-                    <li><a href="#">m</a></li>
-                    <li><a href="#">ft</a></li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class=form-group>
-            <label for=inp-loc-name class="control-label col-sm-4">Name</label>
-            <div class=col-sm-8>
-              <div class=input-group>
-                <input autocomplete=off type=text class=form-control id=loc-name placeholder='"Best Launch Site"'>
-                <div class=input-group-btn>
-                  <button type=button class="btn btn-default dropdown-toggle" data-toggle=dropdown aria-expanded=false>
-                    <span class=caret></span>
-                  </button>
-                  <ul class="dropdown-menu dropdown-menu-right" role=menu>
-                    <li><a href="#">Cambridge, UK</a></li>
-                    <li><a href="#">Elsworth, UK</a></li>
-                    <li><a href="#">Secret HQ</a></li>
-                    <li class=divider></li>
-                    <li><a href="#"><span class="glyphicon glyphicon-save"></span> Save</a></li>
-                    <li><a href="#"><span class="glyphicon glyphicon-trash"></span> Delete</a></li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class=form-group>
-            <label for=inp-date class="control-label col-sm-4">Local Time</label>
-            <div class=col-sm-8>
-              <input type=text class=form-control id=launch-date placeholder="Click to select date">
-            </div>
-          </div>
-          <div class=form-group>
-            <label for=inp-tz class="control-label col-sm-4">UTC Offset</label>
-            <div class=col-sm-8>
-              <div class=input-group>
-                <input type=text class=form-control id=launch-utc-offset>
-                <span class=input-group-addon>hours</span>
-              </div>
-            </div>
-          </div>
-          <div class=form-group>
-            <label for=inp-mode class="control-label col-sm-4">Mode</label>
-            <div class=col-sm-8>
-              <div class=btn-group>
-                <button type=button class="btn btn-default dropdown-toggle" data-toggle=dropdown aria-expanded=false>
-                  Standard <span class=caret></span>
-                </button>
-                <ul class=dropdown-menu role=menu>
-                  <li><a href="#">Standard</a></li>
-                  <li><a href="#">Standard &plusmn;%</a></li>
-                  <li><a href="#">Standard min-max</a></li>
-                  <li><a href="#">Hourly</a></li>
-                </ul>
-              </div>
-              <button type=button class="btn btn-default" title="Choose hours for hourly predictions">
-                <span class="glyphicon glyphicon-time"></span>
-              </button>
-            </div>
-          </div>
-          <div class=form-group>
-            <div class=col-sm-4>
-              <input id=inp-bfp-key name=bfp-key value=b type=hidden>
-              <div class=btn-group>
-                <button type=button class="btn btn-default dropdown-toggle" data-toggle=dropdown aria-expanded=false>
-                  <strong>Burst Alt</strong>
-                  <span class=caret></span>
-                </button>
-                <ul class="dropdown-menu">
-                  <li><a href="#">Burst Alt</a></li>
-                  <li><a href="#">Float Alt</a></li>
-                  <li><a href="#">Payload Mass</a></li>
-                </ul>
-              </div>
-            </div>
-            <div class=col-sm-8>
-              <div class=input-group>
-                <input step=any type=number class=form-control id=inp-bfp-val name=bfp-val required>
-                <div class=input-group-btn>
-                  <button type=button class="btn btn-default dropdown-toggle" data-toggle=dropdown>
-                    km &plusmn;10% <span class=caret></span>
-                  </button>
-                  <ul class="dropdown-menu dropdown-menu-right">
-                    <li><a href="#">km</a></li>
-                    <li><a href="#">kft</a></li>
-                    <li class=divider></li>
-                    <li><a href="#">&plusmn;0%</a></li>
-                    <li><a href="#">&plusmn;5%</a></li>
-                    <li><a href="#">&plusmn;10%</a></li>
-                    <li><a href="#">&plusmn;15%</a></li>
-                    <li><a href="#">&plusmn;20%</a></li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class=form-group>
-            <label for=inp-ar class="control-label col-sm-4">Ascent Rate</label>
-            <div class=col-sm-8>
-              <div class=input-group>
-                <input step=any class=form-control id=inp-ar-min name=ar-min placeholder="Min" type=number required>
-                <input step=any class=form-control id=inp-ar-max name=ar-max placeholder="Max" type=number required>
-                <div class="input-group-btn unit-selector">
-                  <input name=ar-unit value="m/s" type=hidden>
-                  <button type=button class="btn btn-default dropdown-toggle" data-toggle=dropdown>
-                    <span class=current-unit>m/s</span> <span class=caret></span> 
-                  </button>
-                  <ul class="dropdown-menu dropdown-menu-right">
-                    <li><a href="#">m/s</a></li>
-                    <li><a href="#">ft/s</a></li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class=form-group>
-            <div class="col-sm-8 col-sm-offset-2">
-              <button style="width: 100%" type=button class="btn btn-lg btn-success">Run Prediction</button>
-            </div>
-          </div>
-        </form>
-      </div>
-
-      <div class="col-sm-8 col-md-9">
-        <div class="jumbotron">
-          <h1>Map Goes Here</h1>
-          <p>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum
-            quis diam eu eros laoreet elementum in vel ipsum. Maecenas congue
-            viverra sem. Sed tempus pulvinar nunc, non pretium odio tempus
-            vitae.  Phasellus gravida urna leo, et laoreet mauris tempus vitae.
-            Curabitur porttitor volutpat ipsum in fermentum. Quisque laoreet
-            nisl ut enim sodales, non sollicitudin nibh eleifend. Ut sagittis
-            lorem in mauris scelerisque, in egestas metus maximus. 
-          </p>
-        </div>
-      </div>
+      <div class="col-sm-4 col-md-3" id=sidebar></div>
+      <div class="col-sm-8 col-md-9" id=map></div>
     </div>
   </div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.9.0/moment.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.4/js/bootstrap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datetimepicker/4.7.14/js/bootstrap-datetimepicker.min.js"></script>
-  <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/mithril/0.1.33/mithril.min.js"></script>-->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mithril/0.1.33/mithril.min.js"></script>
   <!--<script src="https://maps.googleapis.com/maps/api/js"></script>-->
   <script src="/coffee-script.js"></script>
-  <script src="/tawhiri.coffee" type="text/coffeescript"></script>
+  <script src="/tawhiri_app.coffee" type="text/coffeescript"></script>
 </body>
 </html>
