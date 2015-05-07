@@ -1,0 +1,2 @@
+MapMod.controller = ->
+    return

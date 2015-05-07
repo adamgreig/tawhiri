@@ -1,0 +1,2 @@
+UIMod.TimeMod.controller = ->
+    return

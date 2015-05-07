@@ -1,0 +1,2 @@
+UIMod.BalloonMod.controller = ->
+    return

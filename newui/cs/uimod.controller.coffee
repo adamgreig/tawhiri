@@ -1,0 +1,2 @@
+UIMod.controller = ->
+    ConfigVM.init()

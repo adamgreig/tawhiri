@@ -1,0 +1,2 @@
+UIMod.LocationMod.controller = ->
+    return
