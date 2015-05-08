@@ -10,13 +10,13 @@ UIMod.BalloonMod.view = ->
                          [aria-expanded=false]', ['Standard ', m 'span.caret']),
                      (m 'ul.dropdown-menu[role=menu]', [
                          (m 'li', m 'a[href=#]', 'Standard'),
-                         (m 'li', m 'a[href=#]', ['Standard ', m.trust('&plusmn;'), '% scatter']),
-                         (m 'li', m 'a[href=#]', 'Standard min-max scatter'),
-                         (m 'li', m 'a[href=#]', 'Hourly'),
+                         (m 'li.disabled', m 'a[href=#]', ['Standard ', m.trust('&plusmn;'), '% scatter']),
+                         (m 'li.disabled', m 'a[href=#]', 'Standard min-max scatter'),
+                         (m 'li.disabled', m 'a[href=#]', 'Hourly'),
                      ]),
                  ]),
                  ' ',
-                 (m 'button.btn.btn-default
+                 (m 'button.btn.btn-default.hide
                      [type=button][title="Choose hours for hourly prediction"]',
                     m 'span.glyphicon.glyphicon-time'),
              ]),
@@ -24,14 +24,14 @@ UIMod.BalloonMod.view = ->
          
          # Burst Alt / Float Alt / Payload Mass
          (m '.form-group', [
-             (m '.col-sm-4', m '.btn-group', [
+             (m '.col-sm-4', m '.btn-group.pull-right', [
                  (m 'button.btn.btn-default.dropdown-toggle.dropdown-label
                      [type=button][data-toggle=dropdown][aria-expanded=false]',
                      'Burst Alt'),
                  (m 'ul.dropdown-menu[role=menu]', [
                      (m 'li', m 'a[href=#]', 'Burst Alt'),
-                     (m 'li', m 'a[href=#]', 'Float Alt'),
-                     (m 'li', m 'a[href=#]', 'Payload Mass'),
+                     (m 'li.disabled', m 'a[href=#]', 'Float Alt'),
+                     (m 'li.disabled', m 'a[href=#]', 'Payload Mass'),
                  ]),
              ]),
              (m '.col-sm-8', m '.input-group', [
@@ -42,10 +42,10 @@ UIMod.BalloonMod.view = ->
                  (m '.input-group-btn', [
                      (m 'button.btn.btn-default.dropdown-toggle
                          [type=button][data-toggle=dropdown]',
-                         ['km ', m 'span.caret']),
+                         (m 'span.current-unit', 'km')),
                      (m 'ul.dropdown-menu.dropdown-menu-right.dropdown-menu-units', [
                          (m 'li', m 'a[href=#]', 'km'),
-                         (m 'li', m 'a[href=#]', 'kft'),
+                         (m 'li.disabled', m 'a[href=#]', 'kft'),
                          (m 'li.divider.hide'),
                          (m 'li.hide', m 'a[href=#]', m.trust('&plusmn;0%')),
                          (m 'li.hide', m 'a[href=#]', m.trust('&plusmn;5%')),
@@ -86,7 +86,7 @@ UIMod.BalloonMod.view = ->
 
          # Ascent Rate / Burst Altitude
          (m '.form-group', [
-             (m '.col-sm-4', m '.btn-group', [
+             (m '.col-sm-4', m '.btn-group.pull-right', [
                  (m 'button.btn.btn-default.dropdown-toggle.dropdown-label
                      [type=button][data-toggle=dropdown][aria-expanded=false]',
                      'Ascent Rate'),
@@ -96,17 +96,21 @@ UIMod.BalloonMod.view = ->
                  ]),
              ]),
              (m '.col-sm-8', m '.input-group', [
-                 (m 'input.form-control#inp-ar-min
+                 (m 'input.form-control#inp-ar
+                     [required][type=number][placeholder=""][step=any]',
+                     value: ConfigVM.ascent_rate(),
+                     onchange: m.withAttr 'value', ConfigVM.ascent_rate),
+                 (m 'input.form-control.hide#inp-ar-min
                      [required][type=number][placeholder=""][step=any]'),
                  (m 'input.form-control.hide#inp-ar-max
                      [required][type=number][placeholder=Max][step=any]'),
                  (m '.input-group-btn.unit-selector', [
                      (m 'button.btn.btn-default.dropdown-toggle
                          [data-toggle=dropdown][type=button]',
-                         [(m 'span.current-unit', 'm/s'), ' ', (m 'span.caret')]),
+                         (m 'span.current-unit', 'm/s')),
                      (m 'ul.dropdown-menu.dropdown-menu-right.dropdown-menu-units', [
                          (m 'li', m 'a[href=#]', 'm/s'),
-                         (m 'li', m 'a[href=#]', 'ft/s'),
+                         (m 'li.disabled', m 'a[href=#]', 'ft/s'),
                          (m 'li.divider.hide'),
                          (m 'li.hide', m 'a[href=#]', m.trust('&plusmn;0%')),
                          (m 'li.hide', m 'a[href=#]', m.trust('&plusmn;5%')),

@@ -56,7 +56,7 @@ UIMod.LocationMod.view = ->
                         (m 'span.current-unit', 'm')),
                     (m 'ul.dropdown-menu.dropdown-menu-right.dropdown-menu-units', [
                         (m 'li', m 'a[href=#]', 'm'),
-                        (m 'li', m 'a[href=#]', 'ft') ]),
+                        (m 'li.disabled', m 'a[href=#]', 'ft') ]),
                 ]),
             ]),
          ]),
