@@ -21,9 +21,8 @@ Provide the HTTP API for Tawhiri.
 
 import itertools
 
-from flask import Flask, jsonify, request, g
+from flask import Flask, jsonify, request
 from datetime import datetime
-import time
 import strict_rfc3339
 from werkzeug.exceptions import BadRequest
 
@@ -47,7 +46,8 @@ ruaumoko_ds = None
 @app.before_first_request
 def open_ruaumoko_ds():
     global ruaumoko_ds
-    ds_loc = app.config.get('ELEVATION_DATASET', ElevationDataset.default_location)
+    ds_loc = app.config.get('ELEVATION_DATASET',
+                            ElevationDataset.default_location)
     ruaumoko_ds = ElevationDataset(ds_loc)
 
 
@@ -62,15 +62,17 @@ def open_dataset(ds_time):
         else:
             ds = WindDataset(ds_time, directory=ds_dir)
     except IOError:
-        raise InvalidDatasetException("No matching dataset found.")
-    except ValueError as e:
-        raise InvalidDatasetException(*e.args)
+        raise InvalidDatasetException(ds_time)
+    except ValueError:
+        raise InvalidDatasetException(ds_time)
 
     return ds
+
 
 def timestamp_to_rfc3339(dt):
     """Convert from a UNIX timestamp to a RFC3339 timestamp."""
     return strict_rfc3339.timestamp_to_rfc3339_utcoffset(dt)
+
 
 def json_error(err):
     if hasattr(err, "to_json"):
@@ -83,7 +85,9 @@ def json_error(err):
 
 
 # Exceptions ##################################################################
-class RequestException(BadRequest): pass
+class RequestException(BadRequest):
+    pass
+
 
 class MissingParameter(RequestException, KeyError):
     def __init__(self, key):
@@ -98,6 +102,7 @@ class MissingParameter(RequestException, KeyError):
             "key": self.key,
             "description": self.key
         }
+
 
 class InvalidParameter(RequestException, ValueError):
     def __init__(self, key, value):
@@ -115,9 +120,10 @@ class InvalidParameter(RequestException, ValueError):
             "description": str(self)
         }
 
+
 class TooManyPredictions(RequestException):
     def __init__(self, n):
-        super(TooManyPredictions, self).__init__(str(n))
+        super().__init__(str(n))
         self.n = n
 
     def __str__(self):
@@ -127,6 +133,22 @@ class TooManyPredictions(RequestException):
         return {
             "type": "TooManyPredictions",
             "n": self.n,
+            "description": str(self)
+        }
+
+
+class InvalidDatasetException(RequestException):
+    def __init__(self, ds_time):
+        super().__init(str(ds_time))
+        self.ds_time = ds_time
+
+    def __str__(self):
+        return "Invalid Datashet: {}".format(self.ds_time)
+
+    def to_json(self):
+        return {
+            "type": "InvalidDataset",
+            "ds_time": self.ds_time,
             "description": str(self)
         }
 
@@ -152,12 +174,11 @@ class MultiRequest:
         elif self.profile == PROFILE_FLOAT:
             self.float_altitude = self._get_multi_flts(data, "float_altitude")
 
-            def stvd(x): return x > self.launch_datetime
+            def stvd(x):
+                return x > self.launch_datetime
+
             self.stop_datetime = \
                 self._get_datetime(data, "stop_datetime", validator=stvd)
-
-        else:
-            raise AssertionError(req['profile'])
 
         l = len(self)
         assert l != 0
@@ -166,15 +187,15 @@ class MultiRequest:
 
     def set_default_launch_alt(self, ruaumoko):
         if self.launch_altitude is None:
-            self.launch_altitude = \
-                    ruaumoko.get(self.launch_latitude, self.launch_longitude)
+            self.launch_altitude = ruaumoko.get(
+                self.launch_latitude, self.launch_longitude)
 
     def _get_bool(self, data, key, default=False):
         try:
             r = data[key].lower()
         except KeyError:
             return default
-        
+
         if r not in ("true", "false"):
             raise InvalidParameter(key, r)
 
@@ -193,7 +214,7 @@ class MultiRequest:
             r = float(r)
         except ValueError:
             raise InvalidParameter(key, r)
- 
+
         if not validator(r):
             raise InvalidParameter(key, r)
 
@@ -202,6 +223,7 @@ class MultiRequest:
     def _get_lat(self, data, key):
         return self._get_single_float(data, key,
                                       validator=lambda x: -90 <= x <= 90)
+
     def _get_lon(self, data, key):
         return self._get_single_float(data, key,
                                       validator=lambda x: 0 <= x < 360)
@@ -297,27 +319,25 @@ class MultiRequest:
                 yield Request(self, ascent_rate=asc, burst_altitude=balt,
                               descent_rate=desc)
 
-        elif self.profile == PROFILE_FLOAT: 
+        elif self.profile == PROFILE_FLOAT:
             p = itertools.product(self.ascent_rate, self.float_altitude)
             for asc, falt in p:
                 yield Request(self, ascent_rate=asc, float_altitude=falt)
+
 
 class Request:
     def __init__(self, parent, **specialisation):
         self.parent = parent
         if parent.profile == PROFILE_STANDARD:
-            assert set(specialisation) == \
-                    {"ascent_rate", "burst_altitude", "descent_rate"}
-            self.ascent_rate    = specialisation["ascent_rate"]
+            assert set(specialisation) == {
+                "ascent_rate", "burst_altitude", "descent_rate"}
+            self.ascent_rate = specialisation["ascent_rate"]
             self.burst_altitude = specialisation["burst_altitude"]
-            self.descent_rate   = specialisation["descent_rate"]
+            self.descent_rate = specialisation["descent_rate"]
         elif parent.profile == PROFILE_FLOAT:
-            assert set(specialisation) == \
-                    {"ascent_rate", "float_altitude"}
-            self.ascent_rate    = specialisation["ascent_rate"]
+            assert set(specialisation) == {"ascent_rate", "float_altitude"}
+            self.ascent_rate = specialisation["ascent_rate"]
             self.float_altitude = specialisation["float_altitide"]
-        else:
-            raise AssertionError(req['profile'])
 
     def __getattr__(self, key):
         return getattr(self.parent, key)
@@ -342,8 +362,6 @@ class Request:
         elif self.profile == PROFILE_FLOAT:
             r["float_altitude"] = self.float_altitude
             r["stop_datetime"] = self.stop_datetime
-        else:
-            raise AssertionError(req['profile'])
 
         return r
 
@@ -355,6 +373,7 @@ class Result:
     def __init__(self, req, actual_ds_used):
         self.request = req
         self.actual_ds_used = actual_ds_used
+
 
 class Prediction(Result):
     ok = True
@@ -397,6 +416,7 @@ class Prediction(Result):
 
         return prediction
 
+
 class PredictionFailure(Result):
     ok = False
 
@@ -410,6 +430,7 @@ class PredictionFailure(Result):
             "dataset": self.actual_ds_used,
             "error": json_error(self.error)
         }
+
 
 # Response ####################################################################
 def run_all_predictions(multireq):
