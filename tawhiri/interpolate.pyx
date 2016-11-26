@@ -63,7 +63,13 @@ class RangeError(ValueError):
         self.value = value
         s = "{0}={1}".format(variable, value)
         super(RangeError, self).__init__(s)
-
+    def to_json(self):
+        return {
+            "type": "RangeError",
+            "variable": self.variable,
+            "value": self.value,
+            "description": str(self)
+        }
 
 def make_interpolator(dataset, WarningCounts warnings):
     """
