@@ -39,6 +39,7 @@
                 </coordinates>
             </LineString>
             {% endif %}
+            {% endfor %}
         </Folder>
         {% endfor %}
     </Document>
