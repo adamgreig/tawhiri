@@ -333,7 +333,7 @@ class Prediction(Result):
 
     def to_json(self, skip_paths=False):
         return dict(prediction=self._stages_to_json(skip_paths),
-                    **self.request_to_json())
+                    **self.request.to_json())
 
     def _stages_to_json(self, skip_paths):
         if self.request.profile == PROFILE_STANDARD:
