@@ -337,7 +337,7 @@ class Prediction(Result):
         ret = {"prediction": self._stages_to_json(skip_paths)}
         ret.update(self.request.to_json())
         if self.warningcounts.any:
-            ret.update(self.warningcounts.to_dict())
+            ret.update({"warnings": self.warningcounts.to_dict()})
         return ret
 
     def _stages_to_json(self, skip_paths):
