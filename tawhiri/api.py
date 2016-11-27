@@ -1,4 +1,5 @@
 # Copyright 2014 (C) Priyesh Patel
+# Copyright 2016 Adam Greig
 #
 # This file is part of Tawhiri.
 #
@@ -76,6 +77,13 @@ def json_error(err):
             "type": type(err).__name__,
             "description": str(err)
         }
+
+
+def wrap_lng(lng):
+    if lng > 180:
+        return lng - 360
+    else:
+        return lng
 
 
 # Exceptions ##################################################################
@@ -393,7 +401,7 @@ class Prediction(Result):
                     "path": [
                         {
                             'latitude': round(lat, 6),
-                            'longitude': round(lon, 6),
+                            'longitude': round(wrap_lng(lon), 6),
                             'altitude': round(alt, 1),
                             'datetime': ts_to_rfc3339(dt)
                         } for dt, lat, lon, alt in stage["path"]
@@ -407,7 +415,7 @@ class Prediction(Result):
                     "type": "event",
                     "datetime": ts_to_rfc3339(point[0]),
                     "latitude": round(point[1], 6),
-                    "longitude": round(point[2], 6),
+                    "longitude": round(wrap_lng(point[2]), 6),
                     "altitude": round(point[3], 1)
                 }
 
@@ -496,20 +504,21 @@ def main():
 
     predictions = [p.to_json(multireq.skip_paths) for p in predictions]
 
-    fmt = request.args.get("format")
+    fmt = request.args.get("format", "json")
 
     if fmt == "kml":
         resp = Response(kml_template.render(predictions=predictions),
                         mimetype="application/vnd.google-earth.kml+xml")
         resp.headers["Content-Disposition"] = "attachment;filename=predict.kml"
-        return resp
-
     elif fmt == "csv":
         resp = Response(preds_to_csv(predictions), mimetype="text/plain")
         resp.headers["Content-Disposition"] = "attachment;filename=predict.csv"
-        return resp
+    elif fmt == "json":
+        resp = jsonify(dataset=actual_ds_used, predictions=predictions)
     else:
-        return jsonify(dataset=actual_ds_used, predictions=predictions)
+        raise InvalidParameter("format", fmt)
+
+    return resp
 
 
 @app.route('/api/elevation', methods=['GET'])
