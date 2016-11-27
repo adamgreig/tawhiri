@@ -391,7 +391,7 @@ class Prediction(Result):
 
             elif stage["type"] == "event":
                 point = stage["point"]
-                stage = {
+                ret = {
                     "stage": stage["name"],
                     "type": "event",
                     "datetime": ts_to_rfc3339(point[0]),
