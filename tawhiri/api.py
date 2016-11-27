@@ -24,6 +24,7 @@ import itertools
 from flask import Flask, jsonify, request, abort
 import strict_rfc3339
 from werkzeug.exceptions import BadRequest
+import jinja2
 
 from tawhiri import solver, models, interpolate
 from tawhiri.dataset import Dataset as WindDataset
@@ -39,6 +40,12 @@ PROFILES = {PROFILE_STANDARD, PROFILE_FLOAT}
 PREDICTION_COUNT_LIMIT = 200
 
 ruaumoko_ds = None
+
+jinja_loader = jinja2.PackageLoader("tawhiri", "")
+jinja_env = jinja2.Environment(loader=jinja_loader,
+                               extenions=['jinja2.ext.autoescape'],
+                               undefined=jinja2.StrictUndefined)
+kml_template = jinja_env.get_template("template.kml")
 
 
 # Setup #######################################################################
@@ -457,6 +464,24 @@ def run_all_predictions(multireq, wind_ds):
             yield Prediction(req, actual_ds_used, result, warningcounts)
 
 
+def preds_to_csv(predictions):
+    lines = []
+    for pred_idx, prediction in enumerate(predictions):
+        for stage_idx, stage in enumerate(prediction):
+            if stage["type"] == "event":
+                lines.append((pred_idx, stage_idx, stage["type"],
+                              stage["stage"], stage["datetime"],
+                              stage["latitude"], stage["longitude"],
+                              stage["altitude"]))
+            elif stage["type"] == "path":
+                for point in stage["path"]:
+                    lines.append((pred_idx, stage_idx, stage["type"],
+                                  stage["stage"], point["datetime"],
+                                  point["latitude"], point["longitude"],
+                                  point["altitude"]))
+    return "\n".join(",".join(part) for line in lines for part in line)
+
+
 # Flask App ###################################################################
 @app.route('/api/predict', methods=['GET'])
 def main():
@@ -472,7 +497,14 @@ def main():
 
     predictions = [p.to_json(multireq.skip_paths) for p in predictions]
 
-    return jsonify(dataset=actual_ds_used, predictions=predictions)
+    fmt = request.args.get("format")
+
+    if fmt == "kml":
+        pass
+    elif fmt == "csv":
+        return preds_to_csv(predictions)
+    else:
+        return jsonify(dataset=actual_ds_used, predictions=predictions)
 
 
 @app.route('/api/elevation', methods=['GET'])
