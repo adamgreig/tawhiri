@@ -1,10 +1,10 @@
 {#- Copyright 2014 Jon Sowman, Daniel Richman -#}
+{#- Copyright 2016 Adam Greig -#}
 {%- autoescape true -%}
 <?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
     <Document>
-        <name>Flight Path</name>
-        <description>Description TODO</description>
+        <name>Tawhiri Prediction</name>
         <Style id="yellowPoly">
             <LineStyle>
                 <color>7f00ffff</color>
@@ -14,33 +14,32 @@
                 <color>7f00ff00</color>
             </PolyStyle>
         </Style>
-        <Placemark>
-            <name>Flight path</name>
-            <description>TODO</description>
-            <styleUrl>#yellowPoly</styleUrl>
+        {% for prediction in predictions %}
+        <Folder>
+            <name>Prediction {{ loop.index }}</name>
+            {% for stage in prediction.prediction %}
+            {% if stage.type == "event" %}
+            <Placemark>
+                <name>{{ stage.name }}</name>
+                <Point>
+                    <coordinates>{{ stage.longitude }},{{ stage.latitude }},{{ stage.altitude }}</coordinates>
+                    <altitudeMode>absolute</altitudeMode>
+                </Point>
+            </Placemark>
+            {% elif stage.type == "path" %}
             <LineString>
                 <extrude>1</extrude>
                 <tesselate>1</tesselate>
                 <altitudeMode>absolute</altitudeMode>
+                <styleUrl>#yellowPoly</styleUrl>
                 <coordinates>
-
-{% for time, lat, lon, alt in points -%}
-{{ lon }},{{ lat }},{{ alt }}
-{% endfor %}
+                    {% for point in stage["path"] %}
+                    {{ point.longitude }},{{ stage.latitude }},{{ stage.altitude }}
+                    {% endfor %}
                 </coordinates>
             </LineString>
-        </Placemark>
-
-        {% for marker in markers %}
-            <Placemark>
-                <name>{{ marker.name }}</name>
-                <description>{{ marker.description }}</description>
-                <Point>
-                    {% set time, lat, lon, alt = marker.point %}
-                    <coordinates>{{ lon }},{{ lat }},{{ alt }}</coordinates>
-                    <altitudeMode>absolute</altitudeMode>
-                </Point>
-            </Placemark>
+            {% endif %}
+        </Folder>
         {% endfor %}
     </Document>
 </kml>

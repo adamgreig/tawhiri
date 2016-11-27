@@ -499,7 +499,8 @@ def main():
     fmt = request.args.get("format")
 
     if fmt == "kml":
-        pass
+        return Response(kml_template.render(predictions=predictions),
+                        mimetype="application/vnd.google-earth.kml+xml")
     elif fmt == "csv":
         return Response(preds_to_csv(predictions), mimetype="text/plain")
     else:
