@@ -21,7 +21,7 @@ Provide the HTTP API for Tawhiri.
 
 import itertools
 
-from flask import Flask, jsonify, request, abort, Response, Headers
+from flask import Flask, jsonify, request, abort, Response
 import strict_rfc3339
 from werkzeug.exceptions import BadRequest
 import jinja2
@@ -499,16 +499,15 @@ def main():
     fmt = request.args.get("format")
 
     if fmt == "kml":
-        d = Headers({"Content-Type: application/vnd.google-earth.kml+xml"})
-        d.add("Content-Disposition", "attachment", filename="predict.kml")
-        return Response(kml_template.render(predictions=predictions),
-                        mimetype="application/vnd.google-earth.kml+xml",
-                        headers=d)
+        resp = Response(kml_template.render(predictions=predictions),
+                        mimetype="application/vnd.google-earth.kml+xml")
+        resp.headers["Content-Disposition"] = "attachment;filename=predict.kml"
+        return resp
+
     elif fmt == "csv":
-        d = Headers({"Content-Type: text/plain"})
-        d.add("Content-Disposition", "attachment", filename="predict.csv")
-        return Response(preds_to_csv(predictions), mimetype="text/plain",
-                        headers=d)
+        resp = Response(preds_to_csv(predictions), mimetype="text/plain")
+        resp.headers["Content-Disposition"] = "attachment;filename=predict.csv"
+        return resp
     else:
         return jsonify(dataset=actual_ds_used, predictions=predictions)
 
