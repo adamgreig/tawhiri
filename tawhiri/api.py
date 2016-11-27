@@ -288,7 +288,7 @@ class Request:
         elif parent.profile == PROFILE_FLOAT:
             assert set(specialisation) == {"ascent_rate", "float_altitude"}
             self.ascent_rate = specialisation["ascent_rate"]
-            self.float_altitude = specialisation["float_altitide"]
+            self.float_altitude = specialisation["float_altitude"]
 
     def __getattr__(self, key):
         return getattr(self.parent, key)
@@ -343,53 +343,64 @@ class Prediction(Result):
     def _stages_to_json(self, skip_paths):
         if self.request.profile == PROFILE_STANDARD:
             assert len(self.result) == 2
-            stages = {
-                "launch": {"type": "event", "point": self.result[0][0]},
-                "ascent": {"type": "path", "path": self.result[0]},
-                "burst": {"type": "event", "point": self.result[0][-1]},
-                "descent": {"type": "path", "path": self.result[1]},
-                "land": {"type": "event", "point": self.result[1][-1]}
-            }
+            stages = [
+                {"name": "launch", "type": "event",
+                 "point": self.result[0][0]},
+                {"name": "ascent", "type": "path",
+                 "path": self.result[0]},
+                {"name": "burst", "type": "event",
+                 "point": self.result[0][-1]},
+                {"name": "descent", "type": "path",
+                 "path": self.result[1]},
+                {"name": "land", "type": "event",
+                 "point": self.result[1][-1]}
+            ]
         elif self.request.profile == PROFILE_FLOAT:
             assert len(self.result) == 2
-            stages = {
-                "launch": {"type": "event", "point": self.result[0][0]},
-                "ascent": {"type": "path", "path": self.result[0]},
-                "float": {"type": "event", "point": self.result[0][-1]},
-                "float": {"type": "path", "path": self.result[1]},
-            }
+            stages = [
+                {"name": "launch", "type": "event",
+                 "point": self.result[0][0]},
+                {"name": "ascent", "type": "path",
+                 "path": self.result[0]},
+                {"name": "float_start", "type": "event",
+                 "point": self.result[0][-1]},
+                {"name": "float", "type": "path",
+                 "path": self.result[1]},
+            ]
         else:
             raise AssertionError(self.request.profile)
 
         prediction = []
         ts_to_rfc3339 = strict_rfc3339.timestamp_to_rfc3339_utcoffset
-        for label, leg in stages.items():
-            if leg["type"] == "path":
+        for stage in stages.items():
+            if stage["type"] == "path":
                 # Skip this leg if it's a path and we're truncating them
                 if skip_paths:
                     continue
 
-                stage = {
-                    "stage": label,
+                ret = {
+                    "stage": stage["name"],
+                    "type": "path",
                     "path": [
                         {
                             'latitude': lat, 'longitude': lon,
                             'altitude': alt, 'datetime': ts_to_rfc3339(dt)
-                        } for dt, lat, lon, alt in leg["path"]
+                        } for dt, lat, lon, alt in stage["path"]
                     ]
                 }
 
-            elif leg["type"] == "event":
-                point = leg["point"]
+            elif stage["type"] == "event":
+                point = stage["point"]
                 stage = {
-                    "stage": label,
+                    "stage": stage["name"],
+                    "type": "event",
                     "datetime": ts_to_rfc3339(point[0]),
                     "latitude": point[1],
                     "longitude": point[2],
                     "altitude": point[3],
                 }
 
-            prediction.append(stage)
+            prediction.append(ret)
 
         return prediction
 
