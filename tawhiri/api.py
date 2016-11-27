@@ -21,7 +21,7 @@ Provide the HTTP API for Tawhiri.
 
 import itertools
 
-from flask import Flask, jsonify, request, abort
+from flask import Flask, jsonify, request, abort, Response
 import strict_rfc3339
 from werkzeug.exceptions import BadRequest
 import jinja2
@@ -500,7 +500,7 @@ def main():
     if fmt == "kml":
         pass
     elif fmt == "csv":
-        return preds_to_csv(predictions)
+        return Response(preds_to_csv(predictions), mimetype="text/plain")
     else:
         return jsonify(dataset=actual_ds_used, predictions=predictions)
 
