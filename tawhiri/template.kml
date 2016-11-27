@@ -20,7 +20,7 @@
             {% for stage in prediction.prediction %}
             {% if stage.type == "event" %}
             <Placemark>
-                <name>{{ stage.name }}</name>
+                <name>{{ stage.stage }}</name>
                 <Point>
                     <coordinates>{{ stage.longitude }},{{ stage.latitude }},{{ stage.altitude }}</coordinates>
                     <altitudeMode>absolute</altitudeMode>
