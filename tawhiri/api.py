@@ -467,18 +467,16 @@ def run_all_predictions(multireq, wind_ds):
 def preds_to_csv(predictions):
     lines = []
     for pred_idx, prediction in enumerate(predictions):
-        for stage_idx, stage in enumerate(prediction["prediction"]):
+        for stage in prediction["prediction"]:
             if stage["type"] == "event":
-                lines.append((pred_idx, stage_idx, stage["type"],
-                              stage["stage"], stage["datetime"],
-                              stage["latitude"], stage["longitude"],
-                              stage["altitude"]))
+                lines.append((pred_idx, stage["type"], stage["stage"],
+                              stage["datetime"], stage["latitude"],
+                              stage["longitude"], stage["altitude"]))
             elif stage["type"] == "path":
                 for point in stage["path"]:
-                    lines.append((pred_idx, stage_idx, stage["type"],
-                                  stage["stage"], point["datetime"],
-                                  point["latitude"], point["longitude"],
-                                  point["altitude"]))
+                    lines.append((pred_idx, stage["type"], stage["stage"],
+                                  point["datetime"], point["latitude"],
+                                  point["longitude"], point["altitude"]))
     return "\n".join(",".join(str(x) for x in line) for line in lines)
 
 
