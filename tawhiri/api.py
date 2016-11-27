@@ -27,6 +27,7 @@ from werkzeug.exceptions import BadRequest
 
 from tawhiri import solver, models, interpolate
 from tawhiri.dataset import Dataset as WindDataset
+from tawhiri.warnings import WarningCounts
 from ruaumoko import Dataset as ElevationDataset
 
 app = Flask(__name__)
@@ -327,13 +328,17 @@ class Result:
 class Prediction(Result):
     ok = True
 
-    def __init__(self, req, actual_ds_used, result):
+    def __init__(self, req, actual_ds_used, result, warningcounts):
         super(Prediction, self).__init__(req, actual_ds_used)
         self.result = result
+        self.warningcounts = warningcounts
 
     def to_json(self, skip_paths=False):
-        return dict(prediction=self._stages_to_json(skip_paths),
-                    **self.request.to_json())
+        ret = {"prediction": self._stages_to_json(skip_paths)}
+        ret.update(self.request.to_json())
+        if self.warningcounts.any:
+            ret.update(self.warningcounts.to_json())
+        return ret
 
     def _stages_to_json(self, skip_paths):
         if self.request.profile == PROFILE_STANDARD:
@@ -407,18 +412,19 @@ class PredictionFailure(Result):
 def run_all_predictions(multireq, wind_ds):
     for req in multireq:
         actual_ds_used = wind_ds.ds_time.strftime("%Y-%m-%dT%H:00:00Z")
+        warningcounts = WarningCounts()
 
         # Stages
         if req.profile == PROFILE_STANDARD:
             profile = models.standard_profile(
                 req.ascent_rate, req.burst_altitude,
                 req.descent_rate, wind_ds,
-                ruaumoko_ds
+                ruaumoko_ds, warningcounts
             )
         elif req.profile == PROFILE_FLOAT:
             profile = models.float_profile(
                 req.ascent_rate, req.float_altiutde,
-                req.stop_datetime, wind_ds
+                req.stop_datetime, wind_ds, warningcounts
             )
         else:
             raise AssertionError(req.profile)
@@ -433,7 +439,7 @@ def run_all_predictions(multireq, wind_ds):
         except Exception as e:
             yield PredictionFailure(req, actual_ds_used, e)
         else:
-            yield Prediction(req, actual_ds_used, result)
+            yield Prediction(req, actual_ds_used, result, warningcounts)
 
 
 # Flask App ###################################################################
