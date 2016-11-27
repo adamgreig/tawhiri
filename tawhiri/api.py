@@ -467,7 +467,7 @@ def run_all_predictions(multireq, wind_ds):
 def preds_to_csv(predictions):
     lines = []
     for pred_idx, prediction in enumerate(predictions):
-        for stage_idx, stage in enumerate(prediction):
+        for stage_idx, stage in enumerate(prediction["prediction"]):
             if stage["type"] == "event":
                 lines.append((pred_idx, stage_idx, stage["type"],
                               stage["stage"], stage["datetime"],
