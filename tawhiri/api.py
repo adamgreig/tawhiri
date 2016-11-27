@@ -358,7 +358,7 @@ class Prediction(Result):
 
         prediction = []
         ts_to_rfc3339 = strict_rfc3339.timestamp_to_rfc3339_utcoffset
-        for label, leg in stages:
+        for label, leg in stages.items():
             if leg["type"] == "path":
                 # Skip this leg if it's a path and we're truncating them
                 if skip_paths:
