@@ -22,6 +22,7 @@ Provide the HTTP API for Tawhiri.
 import itertools
 
 from flask import Flask, jsonify, request, abort
+from flask.json import JSONEncoder
 import strict_rfc3339
 from werkzeug.exceptions import BadRequest
 
@@ -69,6 +70,22 @@ def json_error(err):
             "type": type(err).__name__,
             "description": str(err)
         }
+
+
+class CustomJSONEncoder(JSONEncoder):
+    def default(self, obj):
+        try:
+            if isinstance(obj, float):
+                return "{:.6f}".format(obj)
+            else:
+                iterable = iter(obj)
+        except TypeError:
+            pass
+        else:
+            return list(iterable)
+        return super().default(self, obj)
+
+app.json_encoder = CustomJSONEncoder
 
 
 # Exceptions ##################################################################
