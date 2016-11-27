@@ -132,8 +132,7 @@ class MultiRequest:
         self.launch_altitude = \
             self._get_single_float(data, "launch_altitude", optional=True)
         self.profile = self._get_profile(data)
-        self.truncate_trajectories = \
-            self._get_bool(data, "truncate_trajectories")
+        self.skip_paths = self._get_bool(data, "skip_paths")
 
         self.ascent_rate = self._get_multi_flts(data, "ascent_rate")
 
@@ -302,7 +301,7 @@ class Request:
             "launch_datetime": ts_to_rfc3339(self.launch_datetime),
             "launch_altitude": self.launch_altitude,
             "profile": self.profile,
-            "truncate_trajectories": self.truncate_trajectories,
+            "skip_paths": self.skip_paths,
             "ascent_rate": self.ascent_rate
         }
 
@@ -332,36 +331,59 @@ class Prediction(Result):
         super(Prediction, self).__init__(req, actual_ds_used)
         self.result = result
 
-    def to_json(self, truncate_trajectory=False):
-        return {
-            "request": self.request.to_json(),
-            "dataset": self.actual_ds_used,
-            "prediction": self._stages_to_json(truncate_trajectory)
-        }
+    def to_json(self, skip_paths=False):
+        return dict(prediction=self._stages_to_json(skip_paths),
+                    **self.request_to_json())
 
-    def _stages_to_json(self, truncate_trajectory):
+    def _stages_to_json(self, skip_paths):
         if self.request.profile == PROFILE_STANDARD:
-            labels = ("ascent", "descent")
+            assert len(self.result) == 2
+            stages = {
+                "launch": {"type": "event", "point": self.result[0][0]},
+                "ascent": {"type": "path", "path": self.result[0]},
+                "burst": {"type": "event", "point": self.result[0][-1]},
+                "descent": {"type": "path", "path": self.result[1]},
+                "land": {"type": "event", "point": self.result[1][-1]}
+            }
         elif self.request.profile == PROFILE_FLOAT:
-            labels = ("ascent", "float")
+            assert len(self.result) == 2
+            stages = {
+                "launch": {"type": "event", "point": self.result[0][0]},
+                "ascent": {"type": "path", "path": self.result[0]},
+                "float": {"type": "event", "point": self.result[0][-1]},
+                "float": {"type": "path", "path": self.result[1]},
+            }
         else:
             raise AssertionError(self.request.profile)
 
-        assert len(labels) == len(self.result)
-
         prediction = []
-        for label, leg in zip(labels, self.result):
-            if truncate_trajectory:
-                leg = [leg[0], leg[-1]]
+        ts_to_rfc3339 = strict_rfc3339.timestamp_to_rfc3339_utcoffset
+        for label, leg in stages:
+            if leg["type"] == "path":
+                # Skip this leg if it's a path and we're truncating them
+                if skip_paths:
+                    continue
 
-            ts_to_rfc3339 = strict_rfc3339.timestamp_to_rfc3339_utcoffset
-            stage = {
-                "stage": label,
-                "trajectory":
-                    [{'latitude': lat, 'longitude': lon,
-                      'altitude': alt, 'datetime': ts_to_rfc3339(dt)}
-                     for dt, lat, lon, alt in leg]
-            }
+                stage = {
+                    "stage": label,
+                    "path": [
+                        {
+                            'latitude': lat, 'longitude': lon,
+                            'altitude': alt, 'datetime': ts_to_rfc3339(dt)
+                        } for dt, lat, lon, alt in leg["path"]
+                    ]
+                }
+
+            elif leg["type"] == "event":
+                point = leg["point"]
+                stage = {
+                    "stage": label,
+                    "datetime": ts_to_rfc3339(point[0]),
+                    "latitude": point[1],
+                    "longitude": point[2],
+                    "altitude": point[3],
+                }
+
             prediction.append(stage)
 
         return prediction
@@ -374,10 +396,9 @@ class PredictionFailure(Result):
         super(PredictionFailure, self).__init__(req, actual_ds_used)
         self.error = error
 
-    def to_json(self, truncate_trajectory=None):
+    def to_json(self, skip_paths=None):
         return {
             "request": self.request.to_json(),
-            "dataset": self.actual_ds_used,
             "error": json_error(self.error)
         }
 
@@ -389,13 +410,13 @@ def run_all_predictions(multireq, wind_ds):
 
         # Stages
         if req.profile == PROFILE_STANDARD:
-            stages = models.standard_profile(
+            profile = models.standard_profile(
                 req.ascent_rate, req.burst_altitude,
                 req.descent_rate, wind_ds,
                 ruaumoko_ds
             )
         elif req.profile == PROFILE_FLOAT:
-            stages = models.float_profile(
+            profile = models.float_profile(
                 req.ascent_rate, req.float_altiutde,
                 req.stop_datetime, wind_ds
             )
@@ -407,7 +428,7 @@ def run_all_predictions(multireq, wind_ds):
             result = solver.solve(
                 req.launch_datetime, req.launch_latitude,
                 req.launch_longitude, req.launch_altitude,
-                stages
+                profile
             )
         except Exception as e:
             yield PredictionFailure(req, actual_ds_used, e)
@@ -428,8 +449,7 @@ def main():
     if not atleast_one_success:
         raise predictions[0].error
 
-    predictions = [p.to_json(multireq.truncate_trajectories)
-                   for p in predictions]
+    predictions = [p.to_json(multireq.skip_paths) for p in predictions]
 
     return jsonify(dataset=actual_ds_used, predictions=predictions)
 
