@@ -33,7 +33,7 @@
                 <altitudeMode>absolute</altitudeMode>
                 <styleUrl>#yellowPoly</styleUrl>
                 <coordinates>
-                    {% for point in stage["path"] %}
+                    {% for point in stage["path"] -%}
                     {{ point.longitude }},{{ point.latitude }},{{ point.altitude }}
                     {% endfor %}
                 </coordinates>
