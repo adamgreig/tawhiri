@@ -34,8 +34,8 @@ app = Flask(__name__)
 
 API_VERSION = 1
 LATEST_DATASET = "latest"
-PROFILE_STANDARD = "standard_profile"
-PROFILE_FLOAT = "float_profile"
+PROFILE_STANDARD = "standard"
+PROFILE_FLOAT = "float"
 PROFILES = {PROFILE_STANDARD, PROFILE_FLOAT}
 PREDICTION_COUNT_LIMIT = 200
 

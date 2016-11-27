@@ -20,8 +20,8 @@ Tawhiri supports multiple flight profiles which contain a description of the
 model chain to be used when predicting a specific flight type.
 
 Tawhiri currently supports the following profiles:
- * Standard Profile - ``standard_profile``
- * Float Profile - ``float_profile``
+ * Standard Profile - ``standard``
+ * Float Profile - ``float``
 
 Standard Profile
 ^^^^^^^^^^^^^^^^
@@ -29,7 +29,7 @@ A profile for the standard high altitude balloon situation of ascent at a
 constant rate followed by burst and subsequent descent at terminal velocity
 under parachute with a predetermined sea level descent rate.
 
-The API refers to this profile as ``standard_profile``.
+The API refers to this profile as ``standard``.
 
 Float Profile
 ^^^^^^^^^^^^^
@@ -37,7 +37,7 @@ A profile for the typical floating balloon situation of ascent at constant
 altitude to a float altitude which persists for some amount of time before
 stopping. Descent is not predicted when using this profile.
 
-The API refers to this profile as ``float_profile``.
+The API refers to this profile as ``float``.
 
 Requests
 ~~~~~~~~
@@ -53,7 +53,7 @@ addition, each profile accepts various additional parameters.
      - Description
    * - ``profile``
      - optional
-     - ``standard_profile``
+     - ``standard``
      - The profile to use for this prediction.
    * - ``dataset``
      - optional
@@ -162,7 +162,7 @@ Example:
      "launch_datetime": "2014-08-19T23:00:00Z",
      "launch_latitude": 50.0,
      "launch_longitude": 0.01,
-     "profile": "standard_profile",
+     "profile": "standard",
      "version": 1
    }
 
@@ -179,9 +179,9 @@ points. A point consists of a ``latitude`` (decimal degrees), a ``longitude``
 
    * - Profile
      - Stages
-   * - ``standard_profile``
+   * - ``standard``
      - ``ascent``, ``descent``
-   * - ``float_profile``
+   * - ``float``
      - ``ascent``, ``float``
 
 Example (truncated for brevity):
@@ -340,7 +340,7 @@ Response (prediction truncated for brevity):
        "launch_datetime": "2014-08-19T23:00:00Z",
        "launch_latitude": 50.0,
        "launch_longitude": 0.01,
-       "profile": "standard_profile",
+       "profile": "standard",
        "version": 1
      }
    }
