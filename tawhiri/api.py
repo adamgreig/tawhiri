@@ -416,11 +416,8 @@ def run_all_predictions(multireq, wind_ds):
 
 
 # Flask App ###################################################################
-@app.route('/api', methods=['GET'])
+@app.route('/api/predict', methods=['GET'])
 def main():
-    """
-    Single API endpoint which accepts GET requests.
-    """
     wind_ds = open_dataset()
     actual_ds_used = wind_ds.ds_time.strftime("%Y-%m-%dT%H:00:00Z")
     multireq = MultiRequest(request.args)
@@ -437,7 +434,7 @@ def main():
     return jsonify(dataset=actual_ds_used, predictions=predictions)
 
 
-@app.route('/elevation', methods=['GET'])
+@app.route('/api/elevation', methods=['GET'])
 def elevation():
     try:
         lat = float(request.args.get("latitude"))
