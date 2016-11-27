@@ -479,7 +479,7 @@ def preds_to_csv(predictions):
                                   stage["stage"], point["datetime"],
                                   point["latitude"], point["longitude"],
                                   point["altitude"]))
-    return "\n".join(",".join(part) for line in lines for part in line)
+    return "\n".join(",".join(line) for line in lines)
 
 
 # Flask App ###################################################################
