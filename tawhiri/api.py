@@ -134,8 +134,10 @@ class MultiRequest:
             self._get_single_float(data, "launch_altitude", optional=True)
         self.profile = self._get_profile(data)
         self.skip_paths = self._get_bool(data, "skip_paths")
-
         self.ascent_rate = self._get_multi_flts(data, "ascent_rate")
+
+        if -180 <= self.launch_longitude < 0:
+            self.launch_longitude += 360
 
         if self.profile == PROFILE_STANDARD:
             self.burst_altitude = self._get_multi_flts(data, "burst_altitude")
