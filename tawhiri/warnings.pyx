@@ -35,9 +35,10 @@ cdef class WarningCounts:
     def to_dict(self):
         res = \
             { "altitude_too_high":
-                { "count": self.altitude_too_high
-                , "description": "The altitude went too high, above the max "
-                                 "forecast wind. Wind data will be unreliable"
+                { "count": self.altitude_too_high,
+                  "description": "The altitude exceeded the highest forecast "
+                                 "altitude, prediction will be unreliable."
+
                 }
             }
 
