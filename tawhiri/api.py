@@ -22,7 +22,6 @@ Provide the HTTP API for Tawhiri.
 import itertools
 
 from flask import Flask, jsonify, request, abort
-from flask.json import JSONEncoder
 import strict_rfc3339
 from werkzeug.exceptions import BadRequest
 
@@ -70,22 +69,6 @@ def json_error(err):
             "type": type(err).__name__,
             "description": str(err)
         }
-
-
-class CustomJSONEncoder(JSONEncoder):
-    def default(self, obj):
-        try:
-            if isinstance(obj, float):
-                return "{:.6f}".format(obj)
-            else:
-                iterable = iter(obj)
-        except TypeError:
-            pass
-        else:
-            return list(iterable)
-        return super().default(self, obj)
-
-app.json_encoder = CustomJSONEncoder
 
 
 # Exceptions ##################################################################
@@ -402,8 +385,10 @@ class Prediction(Result):
                     "type": "path",
                     "path": [
                         {
-                            'latitude': lat, 'longitude': lon,
-                            'altitude': alt, 'datetime': ts_to_rfc3339(dt)
+                            'latitude': round(lat, 6),
+                            'longitude': round(lon, 6),
+                            'altitude': round(alt, 1),
+                            'datetime': ts_to_rfc3339(dt)
                         } for dt, lat, lon, alt in stage["path"]
                     ]
                 }
@@ -414,9 +399,9 @@ class Prediction(Result):
                     "stage": stage["name"],
                     "type": "event",
                     "datetime": ts_to_rfc3339(point[0]),
-                    "latitude": point[1],
-                    "longitude": point[2],
-                    "altitude": point[3],
+                    "latitude": round(point[1], 6),
+                    "longitude": round(point[2], 6),
+                    "altitude": round(point[3], 1)
                 }
 
             prediction.append(ret)
