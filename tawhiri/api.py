@@ -193,7 +193,7 @@ class MultiRequest:
         except ValueError:
             raise InvalidParameter(key, r)
 
-        if not validator(r):
+        if validator and not validator(r):
             raise InvalidParameter(key, r)
 
         return r
