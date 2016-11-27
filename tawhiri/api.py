@@ -43,7 +43,7 @@ ruaumoko_ds = None
 
 jinja_loader = jinja2.PackageLoader("tawhiri", "")
 jinja_env = jinja2.Environment(loader=jinja_loader,
-                               extenions=['jinja2.ext.autoescape'],
+                               extensions=['jinja2.ext.autoescape'],
                                undefined=jinja2.StrictUndefined)
 kml_template = jinja_env.get_template("template.kml")
 
