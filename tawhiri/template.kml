@@ -20,25 +20,25 @@
             {% set outer_loop = loop %}
             {% for stage in prediction.prediction %}
             <Placemark id="{{ outer_loop.index }}-{{ loop.index }}">
-            {% if stage.type == "event" %}
-                <name>{{ stage.stage }}</name>
-                <Point>
-                    <coordinates>{{ stage.longitude }},{{ stage.latitude }},{{ stage.altitude }}</coordinates>
-                    <altitudeMode>absolute</altitudeMode>
-                </Point>
-            {% elif stage.type == "path" %}
-                <LineString>
-                    <extrude>1</extrude>
-                    <tesselate>1</tesselate>
-                    <altitudeMode>absolute</altitudeMode>
-                    <styleUrl>#yellowPoly</styleUrl>
-                    <coordinates>
-                        {% for point in stage["path"] -%}
-                        {{ point.longitude }},{{ point.latitude }},{{ point.altitude }}
-                        {% endfor %}
-                    </coordinates>
-                </LineString>
-            {% endif %}
+                <styleUrl>#yellowPoly</styleUrl>
+                {% if stage.type == "event" %}
+                    <name>{{ stage.stage }}</name>
+                    <Point>
+                        <coordinates>{{ stage.longitude }},{{ stage.latitude }},{{ stage.altitude }}</coordinates>
+                        <altitudeMode>absolute</altitudeMode>
+                    </Point>
+                {% elif stage.type == "path" %}
+                    <LineString>
+                        <extrude>1</extrude>
+                        <tessellate>1</tessellate>
+                        <altitudeMode>absolute</altitudeMode>
+                        <coordinates>
+                            {% for point in stage["path"] -%}
+                            {{ point.longitude }},{{ point.latitude }},{{ point.altitude }}
+                            {% endfor %}
+                        </coordinates>
+                    </LineString>
+                {% endif %}
             </Placemark>
             {% endfor %}
         </Folder>
