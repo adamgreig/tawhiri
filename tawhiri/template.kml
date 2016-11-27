@@ -34,7 +34,7 @@
                 <styleUrl>#yellowPoly</styleUrl>
                 <coordinates>
                     {% for point in stage["path"] %}
-                    {{ point.longitude }},{{ stage.latitude }},{{ stage.altitude }}
+                    {{ point.longitude }},{{ point.latitude }},{{ point.altitude }}
                     {% endfor %}
                 </coordinates>
             </LineString>
