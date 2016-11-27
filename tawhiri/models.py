@@ -30,9 +30,7 @@ _PI_180 = math.pi / 180.0
 _180_PI = 180.0 / math.pi
 
 
-## Up/Down Models #############################################################
-
-
+# Up/Down Models #############################################################
 def make_constant_ascent(ascent_rate):
     """Return a constant-ascent model at `ascent_rate` (m/s)"""
     def constant_ascent(t, lat, lng, alt):
@@ -70,9 +68,7 @@ def make_drag_descent(sea_level_descent_rate):
     return drag_descent
 
 
-## Sideways Models ############################################################
-
-
+# Sideways Models ############################################################
 def make_wind_velocity(dataset, warningcounts):
     """Return a wind-velocity model, which gives lateral movement at
        the wind velocity for the current time, latitude, longitude and
@@ -80,6 +76,7 @@ def make_wind_velocity(dataset, warningcounts):
     """
     get_wind = interpolate.make_interpolator(dataset, warningcounts)
     dataset_epoch = calendar.timegm(dataset.ds_time.timetuple())
+
     def wind_velocity(t, lat, lng, alt):
         t -= dataset_epoch
         u, v = get_wind(t / 3600.0, lat, lng, alt)
@@ -90,9 +87,7 @@ def make_wind_velocity(dataset, warningcounts):
     return wind_velocity
 
 
-## Termination Criteria #######################################################
-
-
+# Termination Criteria #######################################################
 def make_burst_termination(burst_altitude):
     """Return a burst-termination criteria, which terminates integration
        when the altitude reaches `burst_altitude`.
@@ -112,6 +107,7 @@ def sea_level_termination(t, lat, lng, alt):
     if alt <= 0:
         return True
 
+
 def make_elevation_data_termination(dataset=None):
     """A termination criteria which terminates integration when the
        altitude goes below ground level, using the elevation data
@@ -120,6 +116,7 @@ def make_elevation_data_termination(dataset=None):
     def tc(t, lat, lng, alt):
         return dataset.get(lat, lng) > alt
     return tc
+
 
 def make_time_termination(max_time):
     """A time based termination criteria, which terminates integration when
@@ -131,9 +128,7 @@ def make_time_termination(max_time):
     return time_termination
 
 
-## Model Combinations #########################################################
-
-
+# Model Combinations #########################################################
 def make_linear_model(models):
     """Return a model that returns the sum of all the models in `models`.
     """
@@ -155,9 +150,7 @@ def make_any_terminator(terminators):
     return terminator
 
 
-## Pre-Defined Profiles #######################################################
-
-
+# Pre-Defined Profiles #######################################################
 def standard_profile(ascent_rate, burst_altitude, descent_rate,
                      wind_dataset, elevation_dataset, warningcounts):
     """Make a model chain for the standard high altitude balloon situation of
@@ -172,17 +165,20 @@ def standard_profile(ascent_rate, burst_altitude, descent_rate,
     """
 
     model_up = make_linear_model([make_constant_ascent(ascent_rate),
-                                  make_wind_velocity(wind_dataset, warningcounts)])
+                                  make_wind_velocity(wind_dataset,
+                                  warningcounts)])
     term_up = make_burst_termination(burst_altitude)
 
     model_down = make_linear_model([make_drag_descent(descent_rate),
-                                    make_wind_velocity(wind_dataset, warningcounts)])
+                                    make_wind_velocity(wind_dataset,
+                                    warningcounts)])
     term_down = make_elevation_data_termination(elevation_dataset)
 
     return ((model_up, term_up), (model_down, term_down))
 
 
-def float_profile(ascent_rate, float_altitude, stop_time, dataset, warningcounts):
+def float_profile(ascent_rate, float_altitude, stop_time, dataset,
+                  warningcounts):
     """Make a model chain for the typical floating balloon situation of ascent
        at constant altitude to a float altitude which persists for some
        amount of time before stopping. Descent is in general not modelled.

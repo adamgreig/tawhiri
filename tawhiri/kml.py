@@ -6,6 +6,7 @@ env = jinja2.Environment(loader=loader,
                          undefined=jinja2.StrictUndefined)
 template = env.get_template("template.kml")
 
+
 def kml(stages, markers, filename=None):
     points = stages[0]
     for stage in stages[1:]:

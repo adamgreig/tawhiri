@@ -63,6 +63,7 @@ class RangeError(ValueError):
         self.value = value
         s = "{0}={1}".format(variable, value)
         super(RangeError, self).__init__(s)
+
     def to_json(self):
         return {
             "type": "RangeError",
@@ -187,7 +188,7 @@ cdef double interp3(dataset ds, Lerp3[8] lerps, long variable, long level):
 cdef long search(dataset ds, Lerp3[8] lerps, double target):
     cdef long lower, upper, mid
     cdef double test
-    
+
     lower, upper = 0, 45
 
     while lower < upper:

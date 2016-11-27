@@ -34,7 +34,6 @@ import mmap
 import os
 import os.path
 import signal
-import operator
 from datetime import datetime
 import logging
 
@@ -78,8 +77,8 @@ class Dataset(object):
     pressures_pgrb2bf = [1, 2, 3, 5, 7, 125, 175, 225, 275, 325, 375, 425,
                          475, 525, 575, 625, 675, 725, 775, 825, 875]
 
-    _axes_type = namedtuple("axes",
-                ("hour", "pressure", "variable", "latitude", "longitude"))
+    _axes_type = namedtuple(
+        "axes", ("hour", "pressure", "variable", "latitude", "longitude"))
 
     #: The values of the points on each axis: a 5-(named)tuple ``(hour,
     #: pressure variable, latitude, longitude)``.
@@ -94,8 +93,8 @@ class Dataset(object):
         [x/2.0 for x in range(0, 720)]
     )
 
-    _listdir_type = namedtuple("dataset_in_row",
-                ("ds_time", "suffix", "filename", "path"))
+    _listdir_type = namedtuple(
+        "dataset_in_row", ("ds_time", "suffix", "filename", "path"))
 
     assert shape == tuple(len(x) for x in axes)
 
@@ -192,9 +191,10 @@ class Dataset(object):
         latest = sorted(datasets, reverse=True)[0].ds_time
 
         cached = cls.cached_latest
-        valid = cached and \
-                cached.ds_time == latest and \
-                cached.directory == directory
+        valid = (
+            cached and
+            cached.ds_time == latest and
+            cached.directory == directory)
 
         if valid:
             if persistent:
@@ -255,7 +255,7 @@ class Dataset(object):
                 sz = f.tell()
                 if sz != self.size:
                     raise ValueError("Dataset should be {0} bytes (was {1})"
-                                        .format(self.size, sz))
+                                     .format(self.size, sz))
             f.seek(0, 0)
 
             self.array = mmap.mmap(f.fileno(), 0, prot=prot, flags=flags)

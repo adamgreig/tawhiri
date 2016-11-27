@@ -21,6 +21,7 @@
 Perform numerical integration of the balloon state.
 """
 
+
 def solve(t, lat, lng, alt, chain):
     """Solve from initial conditions `t`, `lat`, `lng`, and `alt`, using
        models and termination criteria from `chain`, an iterable of (model,
@@ -98,6 +99,7 @@ cdef class Configuration:
 
     cdef bint tc(self, double t, Vector y) except *:
         return self.terminator(t, y.lat, y.lng, y.alt)
+
 
 def rk4(double t, double lat, double lng, double alt,
         object model, object terminator,

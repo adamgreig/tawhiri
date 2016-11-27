@@ -24,6 +24,7 @@ from flask.ext.script import Manager
 from .api import app
 manager = Manager(app)
 
+
 def main():
     if 'TAWHIRI_SETTINGS' in os.environ:
         app.config.from_envvar('TAWHIRI_SETTINGS')
