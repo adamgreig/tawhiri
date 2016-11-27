@@ -21,8 +21,7 @@ Provide the HTTP API for Tawhiri.
 
 import itertools
 
-from flask import Flask, jsonify, request
-from datetime import datetime
+from flask import Flask, jsonify, request, abort
 import strict_rfc3339
 from werkzeug.exceptions import BadRequest
 
@@ -33,7 +32,6 @@ from ruaumoko import Dataset as ElevationDataset
 app = Flask(__name__)
 
 API_VERSION = 1
-LATEST_DATASET = "latest"
 PROFILE_STANDARD = "standard"
 PROFILE_FLOAT = "float"
 PROFILES = {PROFILE_STANDARD, PROFILE_FLOAT}
@@ -52,21 +50,9 @@ def open_ruaumoko_ds():
 
 
 # Util functions ##############################################################
-def open_dataset(ds_time):
-    # Find wind data location
+def open_dataset():
     ds_dir = app.config.get('WIND_DATASET_DIR', WindDataset.DEFAULT_DIRECTORY)
-
-    try:
-        if ds_time == LATEST_DATASET:
-            ds = WindDataset.open_latest(persistent=True, directory=ds_dir)
-        else:
-            ds = WindDataset(ds_time, directory=ds_dir)
-    except IOError:
-        raise InvalidDatasetException(ds_time)
-    except ValueError:
-        raise InvalidDatasetException(ds_time)
-
-    return ds
+    return WindDataset.open_latest(persistent=True, directory=ds_dir)
 
 
 def timestamp_to_rfc3339(dt):
@@ -137,22 +123,6 @@ class TooManyPredictions(RequestException):
         }
 
 
-class InvalidDatasetException(RequestException):
-    def __init__(self, ds_time):
-        super().__init(str(ds_time))
-        self.ds_time = ds_time
-
-    def __str__(self):
-        return "Invalid Datashet: {}".format(self.ds_time)
-
-    def to_json(self):
-        return {
-            "type": "InvalidDataset",
-            "ds_time": self.ds_time,
-            "description": str(self)
-        }
-
-
 # Request #####################################################################
 class MultiRequest:
     def __init__(self, data):
@@ -161,7 +131,6 @@ class MultiRequest:
         self.launch_datetime = self._get_datetime(data, "launch_datetime")
         self.launch_altitude = \
             self._get_single_float(data, "launch_altitude", optional=True)
-        self.dataset = self._get_ds_time(data)
         self.profile = self._get_profile(data)
         self.truncate_trajectories = \
             self._get_bool(data, "truncate_trajectories")
@@ -243,24 +212,6 @@ class MultiRequest:
             raise InvalidParameter(key, r)
 
         return r
-
-    def _get_ds_time(self, data):
-        try:
-            ds_time_str = data["dataset"]
-        except KeyError:
-            ds_time_str = LATEST_DATASET
-
-        if ds_time_str != LATEST_DATASET:
-            try:
-                ds_time = datetime.strptime(ds_time_str, "%Y%m%d%H")
-                if ds_time.hour % 6 != 0:
-                    raise ValueError
-            except ValueError:
-                raise InvalidParameter("dataset", ds_time_str)
-        else:
-            ds_time = LATEST_DATASET
-
-        return ds_time
 
     def _get_profile(self, data):
         try:
@@ -350,7 +301,6 @@ class Request:
             "launch_longitude": self.launch_longitude,
             "launch_datetime": ts_to_rfc3339(self.launch_datetime),
             "launch_altitude": self.launch_altitude,
-            "dataset": self.dataset,
             "profile": self.profile,
             "truncate_trajectories": self.truncate_trajectories,
             "ascent_rate": self.ascent_rate
@@ -433,12 +383,9 @@ class PredictionFailure(Result):
 
 
 # Response ####################################################################
-def run_all_predictions(multireq):
-    wind_ds = open_dataset(multireq.dataset)
-    actual_ds_used = wind_ds.ds_time.strftime("%Y-%m-%dT%H:00:00Z")
-
+def run_all_predictions(multireq, wind_ds):
     for req in multireq:
-        assert multireq.dataset == req.dataset
+        actual_ds_used = wind_ds.ds_time.strftime("%Y-%m-%dT%H:00:00Z")
 
         # Stages
         if req.profile == PROFILE_STANDARD:
@@ -469,14 +416,16 @@ def run_all_predictions(multireq):
 
 
 # Flask App ###################################################################
-@app.route('/api/v{0}/'.format(API_VERSION), methods=['GET'])
+@app.route('/api', methods=['GET'])
 def main():
     """
     Single API endpoint which accepts GET requests.
     """
+    wind_ds = open_dataset()
+    actual_ds_used = wind_ds.ds_time.strftime("%Y-%m-%dT%H:00:00Z")
     multireq = MultiRequest(request.args)
     multireq.set_default_launch_alt(ruaumoko_ds)
-    predictions = list(run_all_predictions(multireq))
+    predictions = list(run_all_predictions(multireq, wind_ds))
 
     atleast_one_success = any(p.ok for p in predictions)
     if not atleast_one_success:
@@ -485,7 +434,18 @@ def main():
     predictions = [p.to_json(multireq.truncate_trajectories)
                    for p in predictions]
 
-    return jsonify(predictions=predictions)
+    return jsonify(dataset=actual_ds_used, predictions=predictions)
+
+
+@app.route('/elevation', methods=['GET'])
+def elevation():
+    try:
+        lat = float(request.args.get("latitude"))
+        lng = float(request.args.get("longitude"))
+        result = ruaumoko_ds.get(lat, lng)
+    except ValueError:
+        abort(400)
+    return jsonify(elevation=result)
 
 
 @app.errorhandler(BadRequest)
